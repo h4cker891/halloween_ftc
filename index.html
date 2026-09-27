@@ -329,6 +329,7 @@ const p1 = {
 
   load:0,
   score:0,
+  lastShot:0,
 
   color:"#ff7417"
 };
@@ -349,6 +350,7 @@ const p2 = {
 
   load:0,
   score:0,
+  lastShot:0,
 
   color:"#a968ff"
 };
@@ -894,6 +896,16 @@ function shootObject(player,array){
     return;
   }
 
+  /* Prevent a held button from dumping the whole load instantly. */
+  const now=performance.now();
+
+  if(
+    player.lastShot &&
+    now-player.lastShot<420
+  ){
+    return;
+  }
+
 
   const object = array.find(
     item =>
@@ -907,22 +919,44 @@ function shootObject(player,array){
   }
 
 
-  const cos = Math.cos(player.angle);
-  const sin = Math.sin(player.angle);
+  /* Tiny per-shot spread so loaded objects do not leave as one clump. */
+
+  const angleBias =
+    (Math.random()-.5)*0.10;
+
+  const launchAngle =
+    player.angle+angleBias;
+
+  const cos = Math.cos(launchAngle);
+  const sin = Math.sin(launchAngle);
+
+  const sideBias =
+    (Math.random()-.5)*0.30;
+
+  const sideX =
+    -sin*sideBias;
+
+  const sideY =
+    cos*sideBias;
 
 
   object.x =
     player.x +
-    cos*(ROBOT_SIZE/2+.35);
+    cos*(ROBOT_SIZE/2+.35) +
+    sideX;
 
 
   object.y =
     player.y +
-    sin*(ROBOT_SIZE/2+.35);
+    sin*(ROBOT_SIZE/2+.35) +
+    sideY;
 
 
-  object.vx = cos*8.5;
-  object.vy = sin*8.5;
+  const shotSpeed =
+    8.0+Math.random()*1.2;
+
+  object.vx = cos*shotSpeed;
+  object.vy = sin*shotSpeed;
 
 
   object.flying=true;
@@ -930,6 +964,7 @@ function shootObject(player,array){
 
 
   player.load--;
+  player.lastShot=now;
 }
 
 
@@ -1165,7 +1200,41 @@ function updateObjects(array,player,dt){
             : ghostPositions;
 
 
+        let bestPos=null;
+        let bestScore=-Infinity;
+
+        for(const pos of positions){
+
+          let nearest=999;
+
+          for(const other of array){
+
+            if(
+              other===object ||
+              other.x<-50 ||
+              other.flying
+            ){
+              continue;
+            }
+
+            const d=dist(
+              pos[0],
+              pos[1],
+              other.x,
+              other.y
+            );
+
+            nearest=Math.min(nearest,d);
+          }
+
+          if(nearest>bestScore){
+            bestScore=nearest;
+            bestPos=pos;
+          }
+        }
+
         const pos =
+          bestPos ||
           positions[
             Math.floor(
               Math.random()*
@@ -1184,6 +1253,57 @@ function updateObjects(array,player,dt){
         object.scored=false;
 
         object.respawnTimer=0;
+      }
+    }
+  }
+}
+
+
+function separateObjects(array){
+
+  for(let i=0;i<array.length;i++){
+
+    const a=array[i];
+
+    if(
+      !a.flying ||
+      a.x<-50
+    ){
+      continue;
+    }
+
+    for(let j=i+1;j<array.length;j++){
+
+      const b=array[j];
+
+      if(
+        !b.flying ||
+        b.x<-50
+      ){
+        continue;
+      }
+
+      const dx=b.x-a.x;
+      const dy=b.y-a.y;
+      const d=Math.hypot(dx,dy);
+
+      const minDist =
+        a.radius+b.radius+.06;
+
+      if(
+        d>0 &&
+        d<minDist
+      ){
+
+        const nx=dx/d;
+        const ny=dy/d;
+        const push=(minDist-d)*.5;
+
+        a.x-=nx*push;
+        a.y-=ny*push;
+
+        b.x+=nx*push;
+        b.y+=ny*push;
       }
     }
   }
@@ -1925,6 +2045,7 @@ function resetGame(){
   p1.vy=0;
   p1.load=0;
   p1.score=0;
+  p1.lastShot=0;
 
 
   p2.x=9.0;
@@ -1934,6 +2055,7 @@ function resetGame(){
   p2.vy=0;
   p2.load=0;
   p2.score=0;
+  p2.lastShot=0;
 
 
   makeObjects();
@@ -2078,6 +2200,11 @@ function loop(now){
     p2,
     dt
   );
+
+
+  /* Keep flying objects from becoming one clump. */
+  separateObjects(pumpkins);
+  separateObjects(ghosts);
 
 
   /* =======================================================
