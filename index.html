@@ -818,7 +818,6 @@ function collectPumpkins(){
   for(const pumpkin of pumpkins){
 
     if(
-      pumpkin.flying ||
       pumpkin.x < -50
     ){
       continue;
@@ -836,6 +835,10 @@ function collectPumpkins(){
 
       pumpkin.x=-100;
       pumpkin.y=-100;
+      pumpkin.vx=0;
+      pumpkin.vy=0;
+      pumpkin.flying=false;
+      pumpkin.scored=false;
 
       p1.load++;
 
@@ -857,7 +860,6 @@ function collectGhosts(){
   for(const ghost of ghosts){
 
     if(
-      ghost.flying ||
       ghost.x < -50
     ){
       continue;
@@ -875,6 +877,10 @@ function collectGhosts(){
 
       ghost.x=-100;
       ghost.y=-100;
+      ghost.vx=0;
+      ghost.vy=0;
+      ghost.flying=false;
+      ghost.scored=false;
 
       p2.load++;
 
