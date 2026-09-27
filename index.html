@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎃 PUMPKIN RUN • FTC</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #090909;
+  color: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#topbar {
+  height: 72px;
+  flex-shrink: 0;
+  background: #101010;
+  border-bottom: 2px solid #ff7417;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  z-index: 10;
+}
+
+.title {
+  font-size: 23px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.subtitle {
+  color: #999;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.stats {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+}
+
+.stat {
+  text-align: right;
+}
+
+.stat-label {
+  color: #888;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 900;
+  color: #ff8a24;
+}
+
+#gameWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+#canvas {
+  display: block;
+  background: #151515;
+  border: 3px solid #ff7417;
+  box-shadow: 0 0 0 4px #0b0b0b;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.panel {
+  position: absolute;
+  bottom: 20px;
+  background: rgba(10, 10, 10, 0.94);
+  border: 1px solid #333;
+  padding: 13px 16px;
+  z-index: 5;
+}
+
+#controls {
+  left: 20px;
+}
+
+#objective {
+  right: 20px;
+  text-align: right;
+}
+
+.panel-title {
+  color: #ff8a24;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  margin-bottom: 7px;
+}
+
+.panel-line {
+  color: #ccc;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.key {
+  color: #fff;
+  background: #222;
+  border: 1px solid #444;
+  padding: 2px 5px;
+  font-weight: bold;
+}
+
+#controllerState {
+  color: #777;
+  font-size: 10px;
+  margin-top: 3px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="topbar">
+  <div>
+    <div class="title">🎃 PUMPKIN RUN • FTC</div>
+    <div class="subtitle">HALLOWEEN TRAINING SIMULATOR</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">SCORE</div>
+      <div class="stat-value" id="score">0</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">PUMPKINS</div>
+      <div class="stat-value" id="pumpkins">0/4</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">HITS</div>
+      <div class="stat-value" id="hits">0</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">CONTROLLER</div>
+      <div class="stat-value" id="controller">OFF</div>
+    </div>
+  </div>
+</div>
+
+<div id="gameWrap">
+
+  <canvas id="canvas"></canvas>
+
+  <div class="panel" id="controls">
+    <div class="panel-title">CONTROLS</div>
+    <div class="panel-line">
+      <span class="key">W/S</span> Drive
+      &nbsp;
+      <span class="key">A/D</span> Strafe
+    </div>
+    <div class="panel-line">
+      <span class="key">Q/E</span> Rotate
+    </div>
+    <div class="panel-line">
+      <span class="key">SPACE</span> Collect pumpkins
+    </div>
+    <div class="panel-line">
+      <span class="key">F</span> Launch pumpkin
+    </div>
+    <div class="panel-line">
+      <span class="key">R</span> Reset
+    </div>
+    <div id="controllerState">Controller: not connected</div>
+  </div>
+
+  <div class="panel" id="objective">
+    <div class="panel-title">OBJECTIVE</div>
+    <div class="panel-line">Collect up to 4 pumpkins.</div>
+    <div class="panel-line">Aim at the pumpkin target.</div>
+    <div class="panel-line">Hit the target = <b>+5 POINTS</b></div>
+    <div class="panel-line">Pumpkins bounce off the target.</div>
+  </div>
+
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const FIELD_SIZE = 12;
+const ROBOT_SIZE = 1.5;
+const MAX_PUMPKINS = 4;
+const SCORE_PER_HIT = 5;
+
+let scale = 50;
+
+function resizeCanvas() {
+  const wrap = document.getElementById("gameWrap");
+
+  const maxW = wrap.clientWidth - 32;
+  const maxH = wrap.clientHeight - 32;
+
+  const size = Math.min(maxW, maxH);
+
+  canvas.width = Math.max(400, Math.floor(size));
+  canvas.height = Math.max(400, Math.floor(size));
+
+  scale = canvas.width / FIELD_SIZE;
+}
+
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+
+/* =========================
+   GAME STATE
+========================= */
+
+const game = {
+  score: 0,
+  hits: 0
+};
+
+const robot = {
+  x: 6,
+  y: 8.7,
+  angle: -Math.PI / 2,
+
+  vx: 0,
+  vy: 0,
+
+  speed: 4.8,
+  rotateSpeed: 3.2,
+
+  pumpkins: 0
+};
+
+const target = {
+  x: 6,
+  y: 2.15,
+  radius: 1.05
+};
+
+
+/* =========================
+   PUMPKINS
+========================= */
+
+const pumpkinPositions = [
+  [1.2, 1.4],
+  [2.4, 1.1],
+  [3.7, 1.5],
+  [4.8, 1.0],
+  [7.3, 1.2],
+  [8.5, 1.5],
+  [10.1, 1.1],
+
+  [1.1, 3.2],
+  [2.8, 3.8],
+  [4.2, 3.0],
+  [7.7, 3.5],
+  [9.3, 3.0],
+  [10.8, 3.7],
+
+  [1.5, 5.2],
+  [3.0, 5.8],
+  [4.5, 5.0],
+  [7.4, 5.2],
+  [9.0, 5.7],
+  [10.5, 5.1],
+
+  [1.0, 7.0],
+  [2.7, 7.5],
+  [4.2, 6.8],
+  [7.8, 7.0],
+  [9.5, 7.6],
+  [10.8, 6.8],
+
+  [1.4, 9.0],
+  [3.0, 9.6],
+  [4.5, 8.8],
+  [7.4, 9.4],
+  [8.9, 8.8],
+  [10.5, 9.5],
+
+  [1.2, 10.8],
+  [2.8, 10.4],
+  [4.2, 11.0],
+  [7.7, 10.7],
+  [9.4, 11.0],
+  [10.8, 10.4]
+];
+
+let pumpkins = [];
+
+function createPumpkins() {
+  pumpkins = pumpkinPositions.map((pos, i) => ({
+    id: i,
+    x: pos[0],
+    y: pos[1],
+
+    vx: 0,
+    vy: 0,
+
+    flying: false,
+    scored: false,
+
+    radius: 0.22,
+
+    respawnTimer: 0
+  }));
+}
+
+createPumpkins();
+
+
+/* =========================
+   INPUT
+========================= */
+
+const keys = {};
+
+window.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+
+  if (
+    [" ", "w", "a", "s", "d", "q", "e", "f", "r"].includes(
+      e.key.toLowerCase()
+    )
+  ) {
+    e.preventDefault();
+  }
+});
+
+window.addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+
+/* =========================
+   CONTROLLER
+========================= */
+
+let previousShoot = false;
+let previousReset = false;
+
+function getController() {
+  const pads = navigator.getGamepads
+    ? navigator.getGamepads()
+    : [];
+
+  for (const pad of pads) {
+    if (pad) return pad;
+  }
+
+  return null;
+}
+
+
+/* =========================
+   UTILS
+========================= */
+
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function distance(a, b, c, d) {
+  return Math.hypot(a - c, b - d);
+}
+
+function worldToCanvas(x, y) {
+  return {
+    x: x * scale,
+    y: y * scale
+  };
+}
+
+
+/* =========================
+   ROBOT
+========================= */
+
+function updateRobot(dt) {
+
+  const pad = getController();
+
+  let forward = 0;
+  let strafe = 0;
+  let rotate = 0;
+
+  let intake = false;
+  let shoot = false;
+  let resetButton = false;
+
+  if (pad) {
+
+    // FTC-style controller
+    strafe = pad.axes[0] || 0;
+    forward = -(pad.axes[1] || 0);
+    rotate = pad.axes[2] || 0;
+
+    if (Math.abs(strafe) < 0.12) strafe = 0;
+    if (Math.abs(forward) < 0.12) forward = 0;
+    if (Math.abs(rotate) < 0.12) rotate = 0;
+
+    intake =
+      !!(pad.buttons[0]?.pressed === false ? false : false);
+
+    // X or LB = intake
+    intake =
+      !!pad.buttons[2]?.pressed ||
+      !!pad.buttons[4]?.pressed;
+
+    // A or RB = shoot
+    shoot =
+      !!pad.buttons[0]?.pressed ||
+      !!pad.buttons[5]?.pressed;
+
+    // B = reset
+    resetButton =
+      !!pad.buttons[1]?.pressed;
+
+    document.getElementById("controller").textContent = "ON";
+    document.getElementById("controllerState").textContent =
+      "Controller: connected";
+
+  } else {
+
+    forward =
+      (keys["w"] ? 1 : 0) -
+      (keys["s"] ? 1 : 0);
+
+    strafe =
+      (keys["d"] ? 1 : 0) -
+      (keys["a"] ? 1 : 0);
+
+    rotate =
+      (keys["e"] ? 1 : 0) -
+      (keys["q"] ? 1 : 0);
+
+    intake = !!keys[" "];
+    shoot = !!keys["f"];
+    resetButton = !!keys["r"];
+
+    document.getElementById("controller").textContent = "OFF";
+    document.getElementById("controllerState").textContent =
+      "Controller: not connected";
+  }
+
+  // Rotation
+  robot.angle += rotate * robot.rotateSpeed * dt;
+
+  // Robot-local movement
+  const cos = Math.cos(robot.angle);
+  const sin = Math.sin(robot.angle);
+
+  const worldForwardX = cos;
+  const worldForwardY = sin;
+
+  const worldStrafeX = -sin;
+  const worldStrafeY = cos;
+
+  robot.vx =
+    (worldForwardX * forward +
+      worldStrafeX * strafe) *
+    robot.speed;
+
+  robot.vy =
+    (worldForwardY * forward +
+      worldStrafeY * strafe) *
+    robot.speed;
+
+  robot.x += robot.vx * dt;
+  robot.y += robot.vy * dt;
+
+  const half = ROBOT_SIZE / 2;
+
+  robot.x = clamp(
+    robot.x,
+    half,
+    FIELD_SIZE - half
+  );
+
+  robot.y = clamp(
+    robot.y,
+    half,
+    FIELD_SIZE - half
+  );
+
+  if (intake) {
+    collectPumpkins();
+  }
+
+  if (shoot && !previousShoot) {
+    shootPumpkin();
+  }
+
+  if (resetButton && !previousReset) {
+    resetGame();
+  }
+
+  previousShoot = shoot;
+  previousReset = resetButton;
+}
+
+
+/* =========================
+   INTAKE
+========================= */
+
+function collectPumpkins() {
+
+  if (robot.pumpkins >= MAX_PUMPKINS) {
+    return;
+  }
+
+  for (const p of pumpkins) {
+
+    if (p.flying || p.scored) {
+      continue;
+    }
+
+    const d = distance(
+      robot.x,
+      robot.y,
+      p.x,
+      p.y
+    );
+
+    if (d < 1.05) {
+
+      p.x = -100;
+      p.y = -100;
+
+      robot.pumpkins++;
+
+      updateUI();
+
+      if (robot.pumpkins >= MAX_PUMPKINS) {
+        break;
+      }
+    }
+  }
+}
+
+
+/* =========================
+   SHOOT
+========================= */
+
+function shootPumpkin() {
+
+  if (robot.pumpkins <= 0) {
+    return;
+  }
+
+  let p = pumpkins.find(
+    item =>
+      item.x < -50 &&
+      !item.flying &&
+      !item.scored
+  );
+
+  if (!p) {
+    return;
+  }
+
+  const cos = Math.cos(robot.angle);
+  const sin = Math.sin(robot.angle);
+
+  p.x =
+    robot.x +
+    cos * (ROBOT_SIZE / 2 + 0.35);
+
+  p.y =
+    robot.y +
+    sin * (ROBOT_SIZE / 2 + 0.35);
+
+  p.vx = cos * 8.5;
+  p.vy = sin * 8.5;
+
+  p.flying = true;
+  p.scored = false;
+
+  robot.pumpkins--;
+
+  updateUI();
+}
+
+
+/* =========================
+   TARGET COLLISION
+========================= */
+
+function checkTargetHit(p) {
+
+  if (!p.flying) {
+    return;
+  }
+
+  const dx = p.x - target.x;
+  const dy = p.y - target.y;
+
+  const dist = Math.hypot(dx, dy);
+
+  const hitRadius =
+    target.radius + p.radius;
+
+  if (dist < hitRadius) {
+
+    // Score every actual target hit
+    game.score += SCORE_PER_HIT;
+    game.hits++;
+
+    updateUI();
+
+    // Calculate normal pointing away from target
+    const nx = dx / (dist || 1);
+    const ny = dy / (dist || 1);
+
+    // Current speed
+    let speed = Math.hypot(
+      p.vx,
+      p.vy
+    );
+
+    if (speed < 4) {
+      speed = 4;
+    }
+
+    // Reflect velocity around the target normal
+    const dot =
+      p.vx * nx +
+      p.vy * ny;
+
+    p.vx =
+      p.vx -
+      2 * dot * nx;
+
+    p.vy =
+      p.vy -
+      2 * dot * ny;
+
+    // Preserve a decent bounce speed
+    const newSpeed = Math.hypot(
+      p.vx,
+      p.vy
+    );
+
+    if (newSpeed > 0) {
+      p.vx =
+        (p.vx / newSpeed) * speed;
+
+      p.vy =
+        (p.vy / newSpeed) * speed;
+    }
+
+    // Push pumpkin outside target
+    p.x =
+      target.x +
+      nx * (hitRadius + 0.08);
+
+    p.y =
+      target.y +
+      ny * (hitRadius + 0.08);
+
+    // Prevent another score on the same collision
+    p.scored = true;
+
+    setTimeout(() => {
+      if (p.flying) {
+        p.scored = false;
+      }
+    }, 250);
+  }
+}
+
+
+/* =========================
+   UPDATE PUMPKINS
+========================= */
+
+function updatePumpkins(dt) {
+
+  for (const p of pumpkins) {
+
+    if (p.flying) {
+
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+
+      // Small amount of drag
+      p.vx *= Math.pow(0.995, dt * 60);
+      p.vy *= Math.pow(0.995, dt * 60);
+
+      // Field wall bounce
+      if (p.x < p.radius) {
+        p.x = p.radius;
+        p.vx *= -1;
+      }
+
+      if (p.x > FIELD_SIZE - p.radius) {
+        p.x =
+          FIELD_SIZE - p.radius;
+        p.vx *= -1;
+      }
+
+      if (p.y < p.radius) {
+        p.y = p.radius;
+        p.vy *= -1;
+      }
+
+      if (p.y > FIELD_SIZE - p.radius) {
+        p.y =
+          FIELD_SIZE - p.radius;
+        p.vy *= -1;
+      }
+
+      checkTargetHit(p);
+
+      // After a while, respawn the pumpkin
+      if (
+        p.x < -2 ||
+        p.x > FIELD_SIZE + 2 ||
+        p.y < -2 ||
+        p.y > FIELD_SIZE + 2
+      ) {
+        p.flying = false;
+        p.scored = false;
+        p.respawnTimer = 2;
+      }
+    }
+
+    if (p.respawnTimer > 0) {
+
+      p.respawnTimer -= dt;
+
+      if (p.respawnTimer <= 0) {
+
+        const pos =
+          pumpkinPositions[
+            Math.floor(
+              Math.random() *
+              pumpkinPositions.length
+            )
+          ];
+
+        p.x = pos[0];
+        p.y = pos[1];
+
+        p.vx = 0;
+        p.vy = 0;
+
+        p.flying = false;
+        p.scored = false;
+        p.respawnTimer = 0;
+      }
+    }
+  }
+}
+
+
+/* =========================
+   DRAW FIELD
+========================= */
+
+function drawField() {
+
+  ctx.fillStyle = "#151515";
+  ctx.fillRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  // Floor tiles
+  ctx.strokeStyle = "#222";
+  ctx.lineWidth = 1;
+
+  for (let i = 1; i < FIELD_SIZE; i++) {
+
+    const p = i * scale;
+
+    ctx.beginPath();
+    ctx.moveTo(p, 0);
+    ctx.lineTo(p, canvas.height);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, p);
+    ctx.lineTo(canvas.width, p);
+    ctx.stroke();
+  }
+
+  // Border
+  ctx.strokeStyle = "#ff7417";
+  ctx.lineWidth = 3;
+
+  ctx.strokeRect(
+    1.5,
+    1.5,
+    canvas.width - 3,
+    canvas.height - 3
+  );
+}
+
+
+/* =========================
+   DRAW TARGET
+========================= */
+
+function drawTarget() {
+
+  const x = target.x * scale;
+  const y = target.y * scale;
+  const r = target.radius * scale;
+
+  ctx.save();
+
+  // Outer orange ring
+  ctx.beginPath();
+  ctx.arc(
+    x,
+    y,
+    r,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fillStyle = "#111";
+  ctx.fill();
+
+  ctx.strokeStyle = "#ff7417";
+  ctx.lineWidth = 0.16 * scale;
+  ctx.stroke();
+
+  // Inner ring
+  ctx.beginPath();
+  ctx.arc(
+    x,
+    y,
+    r * 0.72,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.strokeStyle = "#ff9d32";
+  ctx.lineWidth = 0.07 * scale;
+  ctx.stroke();
+
+  // Center
+  ctx.beginPath();
+  ctx.arc(
+    x,
+    y,
+    r * 0.48,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fillStyle = "#050505";
+  ctx.fill();
+
+  // Center crosshair
+  ctx.strokeStyle = "#ff7417";
+  ctx.lineWidth = 0.035 * scale;
+
+  ctx.beginPath();
+  ctx.moveTo(
+    x - r * 0.35,
+    y
+  );
+  ctx.lineTo(
+    x + r * 0.35,
+    y
+  );
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(
+    x,
+    y - r * 0.35
+  );
+  ctx.lineTo(
+    x,
+    y + r * 0.35
+  );
+  ctx.stroke();
+
+
+  /* =====================
+     READABLE LABEL
+  ===================== */
+
+  const label = "PUMPKIN TARGET";
+
+  ctx.font =
+    `900 ${Math.max(12, 0.27 * scale)}px Arial`;
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const textWidth =
+    ctx.measureText(label).width;
+
+  const boxWidth =
+    textWidth + 18;
+
+  const boxHeight = 28;
+
+  const boxY =
+    y - r - 48;
+
+  // Black backing
+  ctx.fillStyle = "#080808";
+
+  ctx.fillRect(
+    x - boxWidth / 2,
+    boxY,
+    boxWidth,
+    boxHeight
+  );
+
+  // Orange border
+  ctx.strokeStyle = "#ff7417";
+  ctx.lineWidth = 2;
+
+  ctx.strokeRect(
+    x - boxWidth / 2,
+    boxY,
+    boxWidth,
+    boxHeight
+  );
+
+  // Text
+  ctx.fillStyle = "#ffffff";
+
+  ctx.fillText(
+    label,
+    x,
+    boxY + boxHeight / 2
+  );
+
+
+  /* =====================
+     SCORE LABEL
+  ===================== */
+
+  ctx.font =
+    `900 ${Math.max(11, 0.22 * scale)}px Arial`;
+
+  const scoreText = "+5 PER HIT";
+
+  const scoreWidth =
+    ctx.measureText(scoreText).width + 14;
+
+  const scoreHeight = 23;
+
+  const scoreY =
+    y + r + 12;
+
+  ctx.fillStyle = "#080808";
+
+  ctx.fillRect(
+    x - scoreWidth / 2,
+    scoreY,
+    scoreWidth,
+    scoreHeight
+  );
+
+  ctx.fillStyle = "#ff9d32";
+
+  ctx.fillText(
+    scoreText,
+    x,
+    scoreY + scoreHeight / 2
+  );
+
+  ctx.restore();
+}
+
+
+/* =========================
+   DRAW PUMPKIN
+========================= */
+
+function drawPumpkin(p) {
+
+  if (
+    p.x < -50 ||
+    p.y < -50
+  ) {
+    return;
+  }
+
+  const x = p.x * scale;
+  const y = p.y * scale;
+  const r = p.radius * scale;
+
+  ctx.save();
+
+  // Pumpkin body
+  ctx.fillStyle = "#f27a16";
+
+  ctx.beginPath();
+  ctx.ellipse(
+    x,
+    y,
+    r * 1.15,
+    r,
+    0,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fill();
+
+  // Pumpkin ridges
+  ctx.strokeStyle = "#c8580c";
+  ctx.lineWidth = Math.max(1, scale * 0.025);
+
+  for (let i = -1; i <= 1; i++) {
+
+    ctx.beginPath();
+
+    ctx.ellipse(
+      x + i * r * 0.38,
+      y,
+      r * 0.55,
+      r * 0.9,
+      0,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.stroke();
+  }
+
+  // Stem
+  ctx.fillStyle = "#4d7a2b";
+
+  ctx.fillRect(
+    x - r * 0.12,
+    y - r * 1.05,
+    r * 0.24,
+    r * 0.35
+  );
+
+  // Tiny spooky face
+  ctx.fillStyle = "#111";
+
+  ctx.beginPath();
+  ctx.arc(
+    x - r * 0.38,
+    y - r * 0.05,
+    r * 0.11,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(
+    x + r * 0.38,
+    y - r * 0.05,
+    r * 0.11,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  ctx.restore();
+}
+
+
+/* =========================
+   DRAW ROBOT
+========================= */
+
+function drawRobot() {
+
+  const x = robot.x * scale;
+  const y = robot.y * scale;
+
+  const size =
+    ROBOT_SIZE * scale;
+
+  ctx.save();
+
+  ctx.translate(x, y);
+  ctx.rotate(robot.angle);
+
+  // Shadow
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+
+  ctx.fillRect(
+    -size / 2 + 4,
+    -size / 2 + 5,
+    size,
+    size
+  );
+
+  // Main chassis
+  ctx.fillStyle = "#252525";
+
+  ctx.fillRect(
+    -size / 2,
+    -size / 2,
+    size,
+    size
+  );
+
+  // Dark frame
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = 0.08 * scale;
+
+  ctx.strokeRect(
+    -size / 2,
+    -size / 2,
+    size,
+    size
+  );
+
+  // Halloween orange frame accents
+  ctx.strokeStyle = "#ff7417";
+  ctx.lineWidth = 0.075 * scale;
+
+  ctx.strokeRect(
+    -size * 0.38,
+    -size * 0.38,
+    size * 0.76,
+    size * 0.76
+  );
+
+  // Warning stripe
+  ctx.fillStyle = "#ff7417";
+
+  ctx.fillRect(
+    -size * 0.5,
+    -size * 0.08,
+    size * 0.12,
+    size * 0.16
+  );
+
+  // Center plate
+  ctx.fillStyle = "#111";
+
+  ctx.fillRect(
+    -size * 0.28,
+    -size * 0.28,
+    size * 0.56,
+    size * 0.56
+  );
+
+  // Spooky eyes
+  ctx.fillStyle = "#ff8a24";
+
+  ctx.beginPath();
+  ctx.arc(
+    -size * 0.16,
+    -size * 0.11,
+    size * 0.055,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(
+    size * 0.16,
+    -size * 0.11,
+    size * 0.055,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  // Front intake/shooter
+  ctx.fillStyle = "#444";
+
+  ctx.fillRect(
+    size * 0.25,
+    -size * 0.23,
+    size * 0.3,
+    size * 0.46
+  );
+
+  ctx.strokeStyle = "#ff7417";
+  ctx.lineWidth = 0.045 * scale;
+
+  ctx.strokeRect(
+    size * 0.25,
+    -size * 0.23,
+    size * 0.3,
+    size * 0.46
+  );
+
+  // Wheels
+  const wheelW = size * 0.15;
+  const wheelH = size * 0.34;
+
+  ctx.fillStyle = "#080808";
+
+  ctx.fillRect(
+    -size * 0.46,
+    -size * 0.42,
+    wheelW,
+    wheelH
+  );
+
+  ctx.fillRect(
+    -size * 0.46,
+    size * 0.08,
+    wheelW,
+    wheelH
+  );
+
+  ctx.fillRect(
+    size * 0.31,
+    -size * 0.42,
+    wheelW,
+    wheelH
+  );
+
+  ctx.fillRect(
+    size * 0.31,
+    size * 0.08,
+    wheelW,
+    wheelH
+  );
+
+  ctx.restore();
+}
+
+
+/* =========================
+   DRAW EVERYTHING
+========================= */
+
+function draw() {
+
+  drawField();
+
+  // Pumpkins
+  for (const p of pumpkins) {
+    drawPumpkin(p);
+  }
+
+  // Target
+  drawTarget();
+
+  // Robot
+  drawRobot();
+}
+
+
+/* =========================
+   UI
+========================= */
+
+function updateUI() {
+
+  document.getElementById("score")
+    .textContent = game.score;
+
+  document.getElementById("pumpkins")
+    .textContent =
+      `${robot.pumpkins}/${MAX_PUMPKINS}`;
+
+  document.getElementById("hits")
+    .textContent = game.hits;
+}
+
+
+/* =========================
+   RESET
+========================= */
+
+function resetGame() {
+
+  game.score = 0;
+  game.hits = 0;
+
+  robot.x = 6;
+  robot.y = 8.7;
+  robot.angle = -Math.PI / 2;
+
+  robot.vx = 0;
+  robot.vy = 0;
+
+  robot.pumpkins = 0;
+
+  previousShoot = false;
+  previousReset = false;
+
+  createPumpkins();
+
+  updateUI();
+}
+
+
+/* =========================
+   GAME LOOP
+========================= */
+
+let lastTime = performance.now();
+
+function loop(now) {
+
+  const dt =
+    Math.min(
+      (now - lastTime) / 1000,
+      0.033
+    );
+
+  lastTime = now;
+
+  updateRobot(dt);
+  updatePumpkins(dt);
+  draw();
+
+  requestAnimationFrame(loop);
+}
+
+updateUI();
+requestAnimationFrame(loop);
+
+
+/* =========================
+   CONTROLLER CONNECTED
+========================= */
+
+window.addEventListener(
+  "gamepadconnected",
+  () => {
+    document.getElementById("controller").textContent =
+      "ON";
+
+    document.getElementById("controllerState").textContent =
+      "Controller: connected";
+  }
+);
+
+window.addEventListener(
+  "gamepaddisconnected",
+  () => {
+    document.getElementById("controller").textContent =
+      "OFF";
+
+    document.getElementById("controllerState").textContent =
+      "Controller: not connected";
+  }
+);
+
+</script>
+
+</body>
+</html>
