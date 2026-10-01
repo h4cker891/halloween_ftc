@@ -24,15 +24,43 @@ body{
 }
 
 #topbar{
-  height:78px;
+  position:relative;
+  overflow:visible;
+  min-height:78px;
+  height:auto;
   flex-shrink:0;
   background:#101010;
   border-bottom:2px solid #ff7417;
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:0 20px;
+  gap:20px;
+  padding:12px 20px;
+  padding-right:clamp(180px, 22vw, 350px);
   z-index:10;
+  box-sizing:border-box;
+}
+
+
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-left:0;
+}
+
+.logo{
+  width:clamp(150px, 20vw, 320px);
+  height:clamp(150px, 20vw, 320px);
+  object-fit:contain;
+  display:block;
+  position:absolute;
+  top:10px;
+  right:18px;
+  z-index:20;
+  pointer-events:none;
+  filter:drop-shadow(0 8px 18px rgba(0,0,0,.55));
 }
 
 .title{
@@ -164,6 +192,65 @@ body{
   color:#888;
   z-index:6;
 }
+
+/* Responsive logo/header layout */
+@media (max-width: 1100px){
+  #topbar{
+    padding:10px 14px;
+    gap:12px;
+  }
+
+  .title{font-size:18px;}
+  .players{gap:14px;}
+  .player{min-width:120px;}
+
+  .logo{
+    width:clamp(120px, 18vw, 210px);
+    height:clamp(120px, 18vw, 210px);
+    top:8px;
+    right:10px;
+  }
+
+  #topbar{
+    padding-right:clamp(135px, 20vw, 235px);
+  }
+}
+
+@media (max-width: 600px){
+  #topbar{
+    min-height:72px;
+    padding:9px 10px;
+  }
+
+  .brand{
+    gap:8px;
+    min-width:0;
+  }
+
+  .title{
+    font-size:15px;
+    letter-spacing:.5px;
+    white-space:nowrap;
+  }
+
+  .subtitle{font-size:8px;}
+  .players{gap:8px;}
+  .player{min-width:0;}
+  .playerStats{gap:7px;}
+  .smallStat{font-size:9px;}
+  .smallStat b{font-size:14px;}
+
+  .logo{
+    width:90px;
+    height:90px;
+    top:6px;
+    right:6px;
+  }
+
+  #topbar{
+    padding-right:108px;
+  }
+}
 </style>
 </head>
 
@@ -171,9 +258,12 @@ body{
 
 <div id="topbar">
 
-  <div>
-    <div class="title">🎃👻 HAUNTED FTC • 2 PLAYER</div>
-    <div class="subtitle">LOCAL MULTIPLAYER TRAINING SIMULATOR</div>
+  <div class="brand">
+    <img class="logo" src="halloween_vision.png" alt="Halloween Vision logo">
+    <div>
+      <div class="title">🎃👻 HAUNTED FTC • 2 PLAYER</div>
+      <div class="subtitle">LOCAL MULTIPLAYER TRAINING SIMULATOR</div>
+    </div>
   </div>
 
   <div class="players">
