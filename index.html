@@ -56,12 +56,15 @@ body{
   object-fit:contain;
   display:block;
   position:absolute;
-  top:10px;
-  right:18px;
-  z-index:20;
+  top:50%;
+  transform:translateY(-50%);
+  z-index:4;
   pointer-events:none;
   filter:drop-shadow(0 8px 18px rgba(0,0,0,.55));
 }
+
+.logo-left{left:18px;}
+.logo-right{right:18px;}
 
 .title{
   font-size:22px;
@@ -205,14 +208,8 @@ body{
   .player{min-width:120px;}
 
   .logo{
-    width:clamp(120px, 18vw, 210px);
-    height:clamp(120px, 18vw, 210px);
-    top:8px;
-    right:10px;
-  }
-
-  #topbar{
-    padding-right:clamp(135px, 20vw, 235px);
+    width:clamp(90px, 12vw, 150px);
+    height:clamp(90px, 12vw, 150px);
   }
 }
 
@@ -241,15 +238,12 @@ body{
   .smallStat b{font-size:14px;}
 
   .logo{
-    width:90px;
-    height:90px;
-    top:6px;
-    right:6px;
+    width:54px;
+    height:54px;
   }
 
-  #topbar{
-    padding-right:108px;
-  }
+  .logo-left{left:2px;}
+  .logo-right{right:2px;}
 }
 </style>
 </head>
@@ -259,7 +253,6 @@ body{
 <div id="topbar">
 
   <div class="brand">
-    <img class="logo" src="halloween_vision.png" alt="Halloween Vision logo">
     <div>
       <div class="title">🎃👻 HAUNTED FTC • 2 PLAYER</div>
       <div class="subtitle">LOCAL MULTIPLAYER TRAINING SIMULATOR</div>
@@ -301,6 +294,9 @@ body{
 
 
 <div id="gameWrap">
+
+  <img class="logo logo-left" src="stemania.jpg" alt="STEMania logo">
+  <img class="logo logo-right" src="vision.jpg" alt="Vision logo">
 
   <div id="connection">
     🎮 Connect up to 2 controllers
